@@ -170,7 +170,6 @@ CG_IDS = {
     "avax": "avalanche-2",
     "base": "base-protocol",  # BASE token (logo carré bleu) — pas le L2
     "btc": "bitcoin",
-    "bonk": "bonk",
     "usdt": "tether",
     "usdc": "usd-coin",
 }
@@ -190,7 +189,7 @@ async def get_prices(ids: list[str], vs: list[str]) -> dict:
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {"ids": ",".join(ids), "vs_currencies": ",".join(vs)}
     async with aiohttp.ClientSession() as s:
-        async with s.get(url, params=params, timeout=10) as r:
+        async with s.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as r:
             r.raise_for_status()
             data = await r.json()
     _prices_cache["t"] = now
@@ -286,7 +285,7 @@ async def cmd_commandes(update: Update, context: ContextTypes.DEFAULT_TYPE, args
         "\n<b>📈 Marché (rapide)</b>",
         "• <code>!dex</code> — ce que signifie « payer le DEX » (bannière + réseaux sociaux, ≈1.5 SOL)",
         "• <code>!fees</code> — slippage/priority/bribe conseillés",
-        "• <code>!bond</code> — explication de la migration (bond vers DEX)\n• <code>!convert</code> — conversions USD/EUR ⇄ SOL/ETH/AVAX/BASE/BTC/BONK/USDT/USDC",
+        "• <code>!bond</code> — explication de la migration (bond vers DEX)\n• <code>!convert</code> — conversions USD/EUR ⇄ SOL/ETH/AVAX/BASE/BTC/USDT/USDC",
         " \n<b>📒 Tutos</b>",
         "• <code>!tuto</code> (hub)\n• <code>!roadmap</code> — parcours conseillé",
         "• <code>!premierspas</code>, <code>!lexique</code> (alias <code>!lx</code>), <code>!bcurve</code> (alias <code>!bondingcurve</code>, <code>!bc</code>), <code>!mev</code>, <code>!tutoaxiom</code>, <code>!debutant</code>, <code>!tracker</code>, <code>!sniprug</code>",
@@ -580,10 +579,10 @@ async def cmd_dex(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List
     await reply(update, text)
 
 
-@register_command(name="convert", help_text="Conversion: !convert 100 usd-sol (ou 2.5 sol-eur, 1 avax-base)")
+@register_command(name="convert", help_text="Conversion: !convert 100 usd-sol (ou 2.5 sol-eur, 1 avax-base, 50 eur-usd)")
 async def cmd_convert(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List[str]):
     if not args:
-        await reply(update, "Usage: <code>!convert 100 usd-sol</code> • <code>!convert 2.5 sol-eur</code> • <code>!convert 1 avax-base</code>")
+        await reply(update, "Usage: <code>!convert 100 usd-sol</code> • <code>!convert 2.5 sol-eur</code> • <code>!convert 1 avax-base</code> • <code>!convert 50 eur-usd</code>")
         return
     raw = " ".join(args).strip()
     # Accept both "100 usd->sol" and "100usd->sol"
@@ -659,7 +658,23 @@ async def cmd_convert(update: Update, context: ContextTypes.DEFAULT_TYPE, args: 
         await reply(update, f"{amount:g} <b>{base.upper()}</b> ≈ <code>{qty:.6f}</code> <b>{quote.upper()}</b>{note_base}")
         return
 
-    await reply(update, "Conversion <b>fiat→fiat</b> non gérée. Utilise crypto↔fiat ou crypto↔crypto.")
+    
+    # Fiat ↔ Fiat via cross-rate from BTC
+    if base in FIATS and quote in FIATS:
+        if base == quote:
+            await reply(update, f"{amount:g} <b>{base.upper()}</b> = <code>{amount:g}</code> <b>{quote.upper()}</b>")
+            return
+        prices_fx = await get_prices(["bitcoin"], list(FIATS))
+        btc_map = prices_fx.get("bitcoin", {})
+        if not btc_map or base not in btc_map or quote not in btc_map:
+            await reply(update, "Taux fiat indisponible actuellement.")
+            return
+        rate = float(btc_map[quote]) / float(btc_map[base])
+        val = amount * rate
+        await reply(update, f"{amount:g} <b>{base.upper()}</b> ≈ <code>{val:.2f}</code> <b>{quote.upper()}</b>")
+        return
+
+    await reply(update, "Paire non prise en charge.")
 @register_command(name="pnl", help_text="Mise en garde sur les cartes PnL")
 async def cmd_pnl(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List[str]):
     text = (
