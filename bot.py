@@ -460,8 +460,8 @@ async def cmd_mev(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List
         "• Concepts: arbitrage, priorisation de tx, <i>sandwich</i>\n"
         "• Risques: pertes, frais élevés, front-run, impacts éthiques/juridiques\n"
         "• Objectif: identifier ces comportements et s'en protéger\n\n"
-        f"👉 Hub MEV & anti-rug : <a href=\"{T_MEV}\">{T_MEV}</a>\n"
-        f"👉 📘 Tuto Axiom : <a href=\"{T_AXIOM}\">{T_AXIOM}</a>"
+        f"👉 Hub astuce et anti-rug : <a href=\"{T_MEV}\">{T_MEV}</a>\n"
+        f"👉 📘 Tuto Axiom et MEV : <a href=\"{T_AXIOM}\">{T_AXIOM}</a>"
     )
     await reply(update, text)
 
