@@ -1,25 +1,23 @@
-app = "realbot-trench"  # <-- remplace par le nom exact de ton app si différent
-primary_region = "cdg"  # Paris (ou la région que tu as choisie)
+# fly.toml app configuration file generated for realbot-trench on 2025-08-12T01:33:09Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-[env]
-  PORT = "3000"
-  CMD_PREFIX = "!"
+app = 'realbot-trench'
+primary_region = 'cdg'
 
-[[services]]
-  protocol = "tcp"
+[build]
+
+[http_service]
   internal_port = 3000
-  processes = ["app"]
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
 
-  [[services.ports]]
-    port = 80
-    handlers = ["http"]
-
-  [[services.ports]]
-    port = 443
-    handlers = ["tls", "http"]
-
-  # Check TCP plutôt que HTTP GET (ton webhook accepte des POST)
-  [[services.tcp_checks]]
-    interval = "15s"
-    timeout = "2s"
-    grace_period = "30s"
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024
