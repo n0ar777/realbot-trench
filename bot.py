@@ -13,6 +13,7 @@ import os
 import logging
 import time
 import random
+import aiohttp
 from datetime import datetime, timezone
 from typing import Awaitable, Callable, Dict, List, Tuple, Optional
 
@@ -161,6 +162,45 @@ def _mention_user(update: Update) -> str:
     return mention_html(u.id, u.full_name if u.full_name else "trader")
 
 # ──────────────────────────────
+# Conversion utils (CoinGecko)
+# ──────────────────────────────
+CG_IDS = {
+    "sol": "solana",
+    "eth": "ethereum",
+    "avax": "avalanche-2",
+    "base": "base-protocol",  # BASE token (logo carré bleu) — pas le L2
+    "btc": "bitcoin",
+    "bonk": "bonk",
+    "usdt": "tether",
+    "usdc": "usd-coin",
+}
+FIATS = {"usd", "eur"}
+
+_prices_cache = {"t": 0, "data": {}}
+
+async def get_prices(ids: list[str], vs: list[str]) -> dict:
+    """
+    Retourne {coingecko_id: {vs: price, ...}, ...} avec un cache ~60s.
+    """
+    now = time.time()
+    key = (tuple(sorted(ids)), tuple(sorted(vs)))
+    cached = _prices_cache["data"].get(key)
+    if cached and (now - _prices_cache["t"] < 60):
+        return cached
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = {"ids": ",".join(ids), "vs_currencies": ",".join(vs)}
+    async with aiohttp.ClientSession() as s:
+        async with s.get(url, params=params, timeout=10) as r:
+            r.raise_for_status()
+            data = await r.json()
+    _prices_cache["t"] = now
+    _prices_cache["data"][key] = data
+    return data
+
+def _norm_sym(s: str) -> str:
+    return (s or "").strip().lower()
+
+# ──────────────────────────────
 # PANELS (callbacks)
 # ──────────────────────────────
 async def panel_root(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -246,9 +286,9 @@ async def cmd_commandes(update: Update, context: ContextTypes.DEFAULT_TYPE, args
         "\n<b>📈 Marché (rapide)</b>",
         "• <code>!dex</code> — ce que signifie « payer le DEX » (bannière + réseaux sociaux, ≈1.5 SOL)",
         "• <code>!fees</code> — slippage/priority/bribe conseillés",
-        "• <code>!bond</code> — explication de la migration (bond vers DEX)",
+        "• <code>!bond</code> — explication de la migration (bond vers DEX)\n• <code>!convert</code> — conversions USD/EUR ⇄ SOL/ETH/AVAX/BASE/BTC/BONK/USDT/USDC",
         " \n<b>📒 Tutos</b>",
-        "• <code>!tuto</code> (hub)",
+        "• <code>!tuto</code> (hub)\n• <code>!roadmap</code> — parcours conseillé",
         "• <code>!premierspas</code>, <code>!lexique</code> (alias <code>!lx</code>), <code>!bcurve</code> (alias <code>!bondingcurve</code>, <code>!bc</code>), <code>!mev</code>, <code>!tutoaxiom</code>, <code>!debutant</code>, <code>!tracker</code>, <code>!sniprug</code>",
         "\n<b>🛠️ Utilitaires</b>",
         "• <code>!setrules</code> (admin), <code>!vote</code>, <code>!riskcalc</code> (MC)",
@@ -421,6 +461,19 @@ async def cmd_lexique(update: Update, context: ContextTypes.DEFAULT_TYPE, args: 
         "<b>📖 Lexique</b>\nToutes les définitions utiles (CT, LP, MC, slippage, etc.).\n👉 <a href=\"%s\">%s</a>" % (LEXIQUE_URL, LEXIQUE_URL)
     )
 
+
+@register_command(name="roadmap", help_text="Parcours conseillé (étapes & liens)")
+async def cmd_roadmap(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List[str]):
+    txt = (
+        "<b>🧭 Roadmap Apprentissage</b>\n"
+        "1) <code>!premierspas</code> — setup & outils de base\n"
+        "2) <code>!debutant</code> — conseils rapides & hygiène\n"
+        "3) <code>!tutoaxiom</code> — guide Axiom détaillé\n"
+        "4) <code>!tracker</code> — suivre wallets & actus\n"
+        "5) <b>Outils utiles</b> — <code>!fees</code>, <code>!dex</code>, <code>!bond</code>, <code>!convert</code>, <code>!pnl</code>, <code>!lexique</code>\n"
+        f"\n👉 <u>Liens directs</u>: Premiers pas: <a href=\"{T_PREMIERSPAS}\">post</a> • Débutant: <a href=\"{T_DEBUTANT}\">post</a> • Axiom: <a href=\"{T_AXIOM}\">tuto</a> • Tracker: <a href=\"{T_TRACKER}\">post</a>"
+    )
+    await reply(update, txt)
 @register_command(name="tutoaxiom", help_text="Tuto Axiom détaillé")
 async def cmd_tutoaxiom(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List[str]):
     text = (
@@ -526,6 +579,87 @@ async def cmd_dex(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List
     )
     await reply(update, text)
 
+
+@register_command(name="convert", help_text="Conversion: !convert 100 usd-sol (ou 2.5 sol-eur, 1 avax-base)")
+async def cmd_convert(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List[str]):
+    if not args:
+        await reply(update, "Usage: <code>!convert 100 usd-sol</code> • <code>!convert 2.5 sol-eur</code> • <code>!convert 1 avax-base</code>")
+        return
+    raw = " ".join(args).strip()
+    # Accept both "100 usd->sol" and "100usd->sol"
+    import re as _re
+    m = _re.match(r"^\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]+)\s*-\s*([a-zA-Z]+)\s*$", raw)
+    if not m:
+        await reply(update, "Format invalide. Ex: <code>!convert 100 usd-sol</code>")
+        return
+    amount = float(m.group(1).replace(",", "."))
+    base = _norm_sym(m.group(2))
+    quote = _norm_sym(m.group(3))
+
+    def sym_to_id(sym: str):
+        if sym in FIATS:
+            return None
+        return CG_IDS.get(sym)
+
+    b_id = sym_to_id(base)
+    q_id = sym_to_id(quote)
+    # Validate symbols
+    if base not in FIATS and not b_id:
+        await reply(update, f"Symbole inconnu: <code>{base}</code>")
+        return
+    if quote not in FIATS and not q_id:
+        await reply(update, f"Symbole inconnu: <code>{quote}</code>")
+        return
+
+    ids = [x for x in {b_id, q_id} if x]
+    vs = list(FIATS | ({quote} if quote in FIATS else set()) | ({base} if base in FIATS else set()))
+    if not ids:
+        ids = ["bitcoin"]  # dummy for fiat->fiat (not handled ultimately)
+    prices = await get_prices(ids, vs)
+
+    def price_in(sym: str, fiat: str) -> float | None:
+        # returns price of sym in fiat (sym can be fiat -> 1 if same fiat)
+        if sym in FIATS:
+            return 1.0 if sym == fiat else None
+        cid = CG_IDS.get(sym)
+        if not cid:
+            return None
+        p = prices.get(cid) or {}
+        val = p.get(fiat)
+        return float(val) if val is not None else None
+
+    note_base = ""
+    if base == "base" or quote == "base":
+        note_base = "\n<i>Note:</i> <b>BASE</b> = token <u>Base Protocol</u>, pas le réseau L2 \"Base\"."
+
+    # Cases
+    if base in FIATS and quote not in FIATS:
+        px = price_in(quote, base)
+        if not px:
+            await reply(update, "Prix indisponible actuellement.")
+            return
+        qty = amount / px
+        await reply(update, f"{amount:g} <b>{base.upper()}</b> ≈ <code>{qty:.6f}</code> <b>{quote.upper()}</b>{note_base}")
+        return
+    if base not in FIATS and quote in FIATS:
+        px = price_in(base, quote)
+        if not px:
+            await reply(update, "Prix indisponible actuellement.")
+            return
+        val = amount * px
+        await reply(update, f"{amount:g} <b>{base.upper()}</b> ≈ <code>{val:.2f}</code> <b>{quote.upper()}</b>{note_base}")
+        return
+    if base not in FIATS and quote not in FIATS:
+        px_b = price_in(base, "usd")
+        px_q = price_in(quote, "usd")
+        if not (px_b and px_q):
+            await reply(update, "Prix croisés indisponibles.")
+            return
+        qty = amount * (px_b / px_q)
+        await reply(update, f"{amount:g} <b>{base.upper()}</b> ≈ <code>{qty:.6f}</code> <b>{quote.upper()}</b>{note_base}")
+        return
+
+    await reply(update, "Conversion <b>fiat→fiat</b> non gérée. Utilise crypto↔fiat ou crypto↔crypto.")
 @register_command(name="pnl", help_text="Mise en garde sur les cartes PnL")
 async def cmd_pnl(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List[str]):
     text = (
@@ -652,6 +786,7 @@ async def cmd_riskcalc(update: Update, context: ContextTypes.DEFAULT_TYPE, args:
         await reply(update, texte)
     except Exception:
         await reply(update, "⚠️ Arguments invalides. Exemple: <code>!riskcalc 1.2m 10 25</code> (k/m/b ok)")
+
 
 # ──────────────────────────────
 # ROUTER & BOOTSTRAP
