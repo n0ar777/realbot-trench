@@ -286,6 +286,9 @@ async def cmd_commandes(update: Update, context: ContextTypes.DEFAULT_TYPE, args
         "• <code>!dex</code> — ce que signifie « payer le DEX » (bannière + réseaux sociaux, ≈1.5 SOL)",
         "• <code>!fees</code> — slippage/priority/bribe conseillés",
         "• <code>!bond</code> — explication de la migration (bond vers DEX)\n• <code>!convert</code> — conversions USD/EUR ⇄ SOL/ETH/AVAX/BASE/BTC/USDT/USDC",
+        
+        "\n<b>⚠️ Warning</b>",
+        "• <code>!pnl</code> — mise en garde sur les cartes PnL (fausses captures, manipulations, etc.)",
         " \n<b>📒 Tutos</b>",
         "• <code>!tuto</code> (hub)\n• <code>!roadmap</code> — parcours conseillé",
         "• <code>!premierspas</code>, <code>!lexique</code> (alias <code>!lx</code>), <code>!bcurve</code> (alias <code>!bondingcurve</code>, <code>!bc</code>), <code>!mev</code>, <code>!tutoaxiom</code>, <code>!debutant</code>, <code>!tracker</code>, <code>!sniprug</code>",
