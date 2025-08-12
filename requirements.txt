@@ -1,0 +1,5 @@
+# Minimal deps for your bot
+# Lock to python-telegram-bot v21.* (your code uses v21 API)
+python-telegram-bot>=21,<22
+python-telegram-bot[webhooks]>=21,<22
+

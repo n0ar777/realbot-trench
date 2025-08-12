@@ -1,0 +1,30 @@
+# Replace APP_NAME_HERE with your Fly.io app name (from the dashboard)
+app = "realbot-trench"
+primary_region = "cdg"  # Paris; pick what you created
+flyctl secrets set BOT_TOKEN=8440783626:AAEtsD3wHvxmurRoRDLSpRGh7gq-cJ0ltZA PUBLIC_URL=https://realbot-trenc.fly.dev
+
+
+[env]
+  PORT = "3000"
+  CMD_PREFIX = "!"
+
+# Expose your internal web server (python-telegram-bot run_webhook listens on PORT)
+[[services]]
+  protocol = "tcp"
+  internal_port = 3000
+  processes = ["app"]
+
+  # Public endpoints
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  # Health check via TCP (your webhook path accepts POST; avoid HTTP GET check)
+  [[services.tcp_checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "30s"
