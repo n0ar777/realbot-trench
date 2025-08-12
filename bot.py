@@ -237,6 +237,7 @@ async def cmd_commandes(update: Update, context: ContextTypes.DEFAULT_TYPE, args
         "<b>📚 Menu complet</b>",
         "\n<b>🧰 Panel</b>",
         "• <code>/start</code> → ouvre le <b>Panel</b> (boutons Liens & Tutos)",
+        "• <code>!start</code> → ouvre le <b>Panel</b> (même chose, pratique en groupe)",
         "\n<b>ℹ️ Core/Aide</b>",
         "• <code>!about</code>, <code>!id</code>, <code>!topic</code>, <code>!ping</code>, <code>!gm</code> (alias <code>!bonjour</code>), <code>!gn</code> (alias <code>!bonnenuit</code>)",
         "\n<b>🔗 Liens</b>",
@@ -256,6 +257,12 @@ async def cmd_commandes(update: Update, context: ContextTypes.DEFAULT_TYPE, args
 
 async def on_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # /start ouvre un panneau visuel
+    await panel_root(update, context)
+
+
+@register_command(name="start", help_text="Ouvre le panel (comme /start)")
+async def cmd_start_alias(update: Update, context: ContextTypes.DEFAULT_TYPE, args: List[str]):
+    # "!start" en groupe pour éviter de ping tous les bots avec "/start"
     await panel_root(update, context)
 
 @register_command(name="about", help_text="À propos du bot", aliases=["info"])
