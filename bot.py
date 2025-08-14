@@ -170,10 +170,16 @@ CG_IDS = {
     "avax": "avalanche-2",
     "base": "base-protocol",  # BASE token (logo carré bleu) — pas le L2
     "btc": "bitcoin",
+    "bnb": "binancecoin",
     "usdt": "tether",
     "usdc": "usd-coin",
 }
-FIATS = {"usd", "eur"}
+FIATS = {
+    "usd","eur","aed","ars","aud","bdt","bhd","bmd","brl","cad","chf","clp","cny","czk","dkk",
+    "gbp","hkd","huf","idr","ils","inr","jpy","krw","kwd","lkr","mmk","mxn","myr","ngn","nok",
+    "nzd","php","pkr","pln","rub","sar","sek","sgd","thb","try","twd","uah","vnd","zar","ron",
+    "cop","pen","egp","mad","qar"
+}
 
 _prices_cache = {"t": 0, "data": {}}
 
